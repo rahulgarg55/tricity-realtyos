@@ -53,3 +53,26 @@
 - [x] Multi-tenancy database boundaries tested and verified
 - [x] Formula injection protection tested and verified
 - [x] WhatsApp HMAC SHA256 webhook signature validation verified
+- [x] Port audit: Port 3000 bypassed (ports 3000, 3001, 3002 occupied), dedicated Port 3050 allocated
+- [x] Pushed to GitHub repository: `https://github.com/rahulgarg55/tricity-realtyos` (commit `dd18172`)
+- [x] Public live deployed tunnel active: `https://plastic-cougar-80.loca.lt`
+
+---
+
+## 4. Live Deployment & Access Links
+
+- **Live Public Deployed URL**: [https://plastic-cougar-80.loca.lt](https://plastic-cougar-80.loca.lt)
+  - *Tunnel Password (if prompted on browser first visit)*: `49.43.108.187`
+- **Local Production Server (Port 3050)**: [http://localhost:3050](http://localhost:3050)
+- **GitHub Repository**: [https://github.com/rahulgarg55/tricity-realtyos](https://github.com/rahulgarg55/tricity-realtyos)
+
+### Pre-configured Demo Accounts
+| Persona | Email | Password | Role |
+|---|---|---|---|
+| Super Admin | `superadmin@tricityrealty.com` | `TricityPass123!` | Platform Super Admin |
+| Builder Owner | `owner@sushmagroup.com` | `TricityPass123!` | Sushma Urban Developers Owner |
+| Brokerage Owner | `owner@primechd.com` | `TricityPass123!` | Tricity Prime Brokers Owner |
+| Sales Representative | `rahul.sales@sushmagroup.com` | `TricityPass123!` | Sushma Sales Executive |
+
+*(1-Click Demo Switcher is also available directly on the `/login` page)*
+
