@@ -1,0 +1,308 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id                      String   @id @default(uuid())
+  name                    String
+  slug                    String   @unique
+  logoUrl                 String?
+  phone                   String?
+  address                 String?
+  city                    String   @default("Mohali")
+  state                   String   @default("Punjab")
+  country                 String   @default("India")
+  timezone                String   @default("Asia/Kolkata")
+  currency                String   @default("INR")
+  
+  // Subscription & billing
+  subscriptionTier        String   @default("STARTER") // STARTER, GROWTH, BUSINESS, ENTERPRISE
+  subscriptionStatus      String   @default("ACTIVE")  // ACTIVE, TRIALING, PAST_DUE, CANCELLED
+  stripeCustomerId        String?
+  stripeSubscriptionId    String?
+  subscriptionRenewsAt    DateTime?
+  maxUsers                Int      @default(5)
+  maxLeads                Int      @default(500)
+  maxProjects             Int      @default(3)
+  
+  // WhatsApp Integration
+  whatsappEnabled         Boolean  @default(false)
+  whatsappPhoneNumberId   String?
+  whatsappBusinessAccountId String?
+  whatsappAccessToken     String?
+  whatsappWebhookSecret   String?
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  users                   User[]
+  leads                   Lead[]
+  projects                Project[]
+  inventoryUnits          InventoryUnit[]
+  siteVisits              SiteVisit[]
+  tasks                   TaskFollowUp[]
+  activities              LeadActivity[]
+  whatsAppMessages        WhatsAppMessage[]
+  invoices                SubscriptionInvoice[]
+  auditLogs               AuditLog[]
+}
+
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  name            String
+  phone           String?
+  passwordHash    String
+  role            String        @default("SALES_REP") // SUPER_ADMIN, OWNER, ADMIN, SALES_MANAGER, SALES_REP, VIEWER
+  isSuperAdmin    Boolean       @default(false)
+  isActive        Boolean       @default(true)
+  avatarUrl       String?
+  
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  assignedLeads   Lead[]        @relation("AssignedLeads")
+  assignedVisits  SiteVisit[]   @relation("AssignedVisits")
+  assignedTasks   TaskFollowUp[] @relation("AssignedTasks")
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Project {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  name            String        // e.g., "The Palm Mohali", "Sushma Grande Zirakpur"
+  developer       String        // e.g., "Manohar Infrastructure", "Sushma Buildtech"
+  location        String        // e.g., "Sector 82, Airport Road"
+  city            String        @default("Mohali") // Chandigarh, Mohali, Zirakpur, Panchkula, New Chandigarh
+  projectType     String        @default("Residential") // Residential, Commercial, Plotted, Mixed
+  description     String?
+  amenities       String?       // Comma-separated or JSON list
+  brochureUrl     String?
+  startingPrice   Float?
+  status          String        @default("UNDER_CONSTRUCTION") // UPCOMING, UNDER_CONSTRUCTION, READY_TO_MOVE, COMPLETED
+  reraNumber      String?
+
+  units           InventoryUnit[]
+  leads           Lead[]
+  siteVisits      SiteVisit[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model InventoryUnit {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  projectId       String
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  unitNumber      String        // e.g., "Tower A - 402", "Villa 12", "SCO 34"
+  tower           String?
+  floor           Int?
+  unitType        String        @default("3BHK") // 2BHK, 3BHK, 4BHK, Villa, Penthouse, Plot, Commercial SCO
+  carpetAreaSqFt  Float
+  superAreaSqFt   Float?
+  askingPrice     Float
+  status          String        @default("AVAILABLE") // AVAILABLE, ON_HOLD, BOOKED, SOLD, UNAVAILABLE
+  
+  // Hold management with expiry
+  heldUntil       DateTime?
+  heldByUserId    String?
+  bookingAmount   Float?
+  
+  leadId          String?       // Lead attached if held/booked
+  lead            Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  assignedUserId  String?
+  notes           String?
+
+  siteVisits      SiteVisit[]
+  statusHistory   InventoryStatusHistory[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model InventoryStatusHistory {
+  id              String        @id @default(uuid())
+  unitId          String
+  unit            InventoryUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  fromStatus      String
+  toStatus        String
+  changedByUserId String
+  reason          String?
+  timestamp       DateTime      @default(now())
+}
+
+model Lead {
+  id                String        @id @default(uuid())
+  organizationId    String
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name              String
+  phone             String
+  email             String?
+  preferredLocation String?       // e.g. "Mohali Sector 82", "Zirakpur PR7", "New Chandigarh"
+  budgetMin         Float?
+  budgetMax         Float?
+  propertyType      String?       // 2BHK, 3BHK, 4BHK, Villa, Plot, Commercial
+  
+  projectId         String?
+  project           Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  leadSource        String        @default("Website") // Website, Meta Ads, WhatsApp, MagicBricks, 99Acres, Walk-in, Referral
+  priority          String        @default("MEDIUM")  // LOW, MEDIUM, HIGH, HOT
+  stage             String        @default("NEW_LEAD") // NEW_LEAD, CONTACTED, QUALIFIED, SITE_VISIT_SCHEDULED, SITE_VISIT_COMPLETED, NEGOTIATION, BOOKING, WON, LOST
+  
+  assignedUserId    String?
+  assignedUser      User?         @relation("AssignedLeads", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  lastContactedAt   DateTime?
+  nextFollowUpDate  DateTime?
+  lostReason        String?       // Budget Mismatch, Location Mismatch, Purchased Elsewhere, Dropped Plan, Invalid Number
+  lostNotes         String?
+  expectedRevenue   Float?
+  notes             String?
+  isArchived        Boolean       @default(false)
+
+  siteVisits        SiteVisit[]
+  tasks             TaskFollowUp[]
+  activities        LeadActivity[]
+  inventoryUnits    InventoryUnit[]
+  whatsAppMessages  WhatsAppMessage[]
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model SiteVisit {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  leadId          String
+  lead            Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  projectId       String
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  inventoryUnitId String?
+  inventoryUnit   InventoryUnit? @relation(fields: [inventoryUnitId], references: [id], onDelete: SetNull)
+
+  assignedUserId  String
+  assignedUser    User          @relation("AssignedVisits", fields: [assignedUserId], references: [id], onDelete: Cascade)
+
+  scheduledDate   DateTime
+  timeSlot        String        @default("11:00 AM - 12:00 PM")
+  status          String        @default("SCHEDULED") // SCHEDULED, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW
+  location        String?
+  clientFeedback  String?
+  outcome         String?       // VERY_INTERESTED, REQUESTED_PRICE_QUOTE, NEGOTIATING, NOT_INTERESTED, RESCHEDULE_REQUESTED
+  notes           String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model TaskFollowUp {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  leadId          String?
+  lead            Lead?         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  assignedUserId  String
+  assignedUser    User          @relation("AssignedTasks", fields: [assignedUserId], references: [id], onDelete: Cascade)
+
+  title           String
+  type            String        @default("CALL") // CALL, MEETING, SITE_VISIT, WHATSAPP, EMAIL, OTHER
+  priority        String        @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate         DateTime
+  completedAt     DateTime?
+  isCompleted     Boolean       @default(false)
+  notes           String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model LeadActivity {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  leadId          String
+  lead            Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  userId          String?
+  activityType    String        // STAGE_CHANGE, NOTE_ADDED, CALL_LOGGED, VISIT_SCHEDULED, WHATSAPP_SENT, REASSIGNED, CREATED
+  title           String
+  description     String?
+  metadata        String?       // JSON string
+
+  createdAt       DateTime      @default(now())
+}
+
+model WhatsAppMessage {
+  id                String        @id @default(uuid())
+  organizationId    String
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  leadId            String?
+  lead              Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  direction         String        @default("OUTBOUND") // INBOUND, OUTBOUND
+  fromNumber        String
+  toNumber          String
+  messageBody       String
+  templateName      String?
+  status            String        @default("SENT") // QUEUED, SENT, DELIVERED, READ, FAILED
+  whatsappMessageId String?
+  errorMessage      String?
+  isMock            Boolean       @default(false)
+
+  createdAt         DateTime      @default(now())
+}
+
+model SubscriptionInvoice {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  amount          Float
+  currency        String        @default("INR")
+  status          String        @default("PAID") // PAID, PENDING, FAILED
+  plan            String        @default("STARTER") // STARTER, GROWTH, BUSINESS
+  invoiceNumber   String
+  stripeInvoiceId String?
+  paidAt          DateTime?
+
+  createdAt       DateTime      @default(now())
+}
+
+model AuditLog {
+  id              String        @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId          String?
+  action          String        // LOGIN, CREATE_LEAD, BULK_IMPORT, EXPORT_LEADS, BOOK_UNIT, CHANGE_STAGE, DELETE_LEAD, UPDATE_PLAN
+  entityType      String
+  entityId        String?
+  details         String?       // JSON string
+  ipAddress       String?
+
+  createdAt       DateTime      @default(now())
+}

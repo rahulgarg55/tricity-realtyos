@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tricity-realtyos-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://realty_user:realty_secure_password@postgres:5432/realtyos?sslmode=disable
+      - JWT_SECRET=change-this-to-a-secure-32-byte-hex-string-for-prod
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: tricity-realtyos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: realty_user
+      POSTGRES_PASSWORD: realty_secure_password
+      POSTGRES_DB: realtyos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U realty_user -d realtyos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
